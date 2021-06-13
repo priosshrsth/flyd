@@ -1,4 +1,4 @@
-var flyd = require('../../lib');
+var flyd = require('flyd');
 require('whatwg-fetch');
 
 document.addEventListener('DOMContentLoaded', function() {

@@ -4,7 +4,7 @@ var assert = require('assert');
 
 var switchLatest = require('../index.js');
 
-describe('switchLatest', function() {
+describe('takeUntil', function() {
   it('emits values from first stream in stream', function() {
     var result = [];
     var source = stream();

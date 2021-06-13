@@ -1,5 +1,5 @@
 var R = require('ramda');
-var flyd = require('../../lib');
+var flyd = require('flyd');
 
 // Let's create a stream of numbers
 var numbers = flyd.stream();
