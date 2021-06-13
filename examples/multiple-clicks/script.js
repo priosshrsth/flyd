@@ -1,5 +1,5 @@
-var flyd = require('../../lib');
-var afterSilence = require('../../module/aftersilence');
+var flyd = require('flyd');
+var afterSilence = require('flyd-aftersilence');
 
 document.addEventListener('DOMContentLoaded', function() {
   var btnElm = document.getElementById('btn');

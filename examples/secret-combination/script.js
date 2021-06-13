@@ -1,9 +1,9 @@
-var flyd = require('../../lib');
+var flyd = require('flyd');
 var stream = flyd.stream;
-var filter = require('../../module/filter');
-var lift = require('../../module/lift');
-var inLast = require('../../module/inlast');
-var sampleOn = require('../../module/sampleon');
+var filter = require('flyd-filter');
+var lift = require('flyd-lift');
+var inLast = require('flyd-inlast');
+var sampleOn = require('flyd-sampleon');
 
 var magicSeq = 'abbaba';
 var seqLen = magicSeq.length;

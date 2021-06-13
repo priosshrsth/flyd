@@ -46,7 +46,9 @@ __Other features__
 
 * Supports the transducer protocol. You can for instance transduce streams with
   [Ramda](http://ramdajs.com/) and [transducers.js](https://github.com/jlongster/transducers.js).
-* Conforms to the fantasy land [monad](https://github.com/fantasyland/fantasy-land#monad) specification
+* Complies to the [fantasy land](https://github.com/fantasyland/fantasy-land)
+  applicative specification.
+* [Elegant support for promises](#using-promises-for-asynchronous-operations).
 * [Atomic updates](#atomic-updates).
 
 ## Examples
@@ -207,31 +209,19 @@ after an actual response has been received (otherwise `responses()` would return
 streams has received a value (this behaviour can be circumvented with
 [flyd.immediate](#flydimmediatestream)).
 
-### Promises
-Flyd has two helpers for dealing with promises: `flyd.fromPromise` and `flyd.flattenPromise`.
+### Using promises for asynchronous operations
 
-Let's say you're building a filtered list. It is important to you that the latest filter always corresponds
-to the latest promise and its resolution. using `flyd.fromPromise` guarantees the ordering, and can skip intermediate results.
+Flyd has inbuilt support for promises. Similarly to how a promise can never be
+resolved with a promise, a promise can never flow down a stream. Instead the
+fulfilled value of the promise will be sent down the stream.
 
-```js
-const filter = flyd.stream('');
-const results = filter
-  .pipe(flyd.chain(
-    filter => flyd.fromPromise(requestPromise(`https://example.com?q=${filter}`))
-  ));
-```
-
-On the other hand let's say you want to sum some numbers from a service you've written.
-Every time someone clicks on your site you want to send a request and get back a random number to be tallied.
-
-`flyd.flattenPromise` gives you the guarantee that every promise resolution will be handled, regardless of order.
-
-```js
-const clicks = flyd.stream();
-const total = clicks
-  .map(getNumberAsync)
-  .pipe(flyd.flattenPromise)
-  .pipe(flyd.scan((acc, v)=> acc + v, 0));
+```javascript
+var urls = flyd.stream('/something.json');
+var responses = flyd.stream(requestPromise(urls()));
+flyd.on(function(responses) {
+  console.log('Received response!');
+  console.log(responses());
+}, responses);
 ```
 
 ### Mapping over a stream
@@ -361,7 +351,7 @@ var max = flyd.combine(function(n1, n2, self, changed) {
 }, [n1, n2]);
 ```
 
-### flyd.isStream(stream)
+###flyd.isStream(stream)
 
 Returns `true` if the supplied argument is a Flyd stream and `false` otherwise.
 
@@ -378,7 +368,7 @@ flyd.isStream(s); //=> true
 flyd.isStream(n); //=> false
 ```
 
-### flyd.immediate(stream)
+###flyd.immediate(stream)
 
 By default the body of a dependent stream is only called when all the streams
 upon which it depends has a value. `immediate` can circumvent this behaviour.
@@ -403,7 +393,7 @@ s([]);
 console.log(hasItems()); // logs `false`.
 ```
 
-### flyd.endsOn(endStream, s)
+###flyd.endsOn(endStream, s)
 
 Changes which `endsStream` should trigger the ending of `s`.
 
@@ -422,7 +412,7 @@ var double = flyd.endsOn(flyd.merge(n.end, killer), flyd.combine(function(n) {
 }, [n]);
 ```
 
-### flyd.map(fn, s)
+###flyd.map(fn, s)
 
 Returns a new stream consisting of every value from `s` passed through `fn`. I.e. `map` creates
 a new stream that listens to `s` and applies `fn` to every new value.
@@ -436,62 +426,8 @@ __Example__
 var numbers = flyd.stream(0);
 var squaredNumbers = flyd.map(function(n) { return n*n; }, numbers);
 ```
-### flyd.chain(fn, s)
-`fn` must return a stream.
 
-`fn` is run every time a value is pushed into `s`.
-Returns a single stream of merged values from the created streams.
-
-Ends when every created stream and the main stream ends
-
-__Signature__
-
-`(a -> Stream b) -> Stream a -> Stream b`
-
-__Example__
-```javascript
-var filter = flyd.stream('filter');
-var search_results = flyd.chain(function(filter){
-  return flyd.stream(getResults(filter));
-}, filter);
-```
-
-### flyd.ap(valueStream, functionStream)
-
-Applies the value in `valueStream` to the function in `functionStream`
-
-__Signature__
-`Stream a -> Stream (a -> b) -> Stream b`
-
-__Example__
-```javascript
-function add3(x) { return x + 3; }
-flyd.ap(flyd.stream(5), flyd.stream(add3)) // stream(8);
-```
-
-while it can not seem useful immediately consider this example
-
-```javascript
-var get_results = function (filter, sortProperty, sortDirection) {
-  return flyd.stream(fetch(`${base_url}/search?q=${filter}&sort=${sortProperty} ${sortDirection}`))
-};
-
-// this would eventually be linked to an input field
-var filter = flyd.stream('');
-var sortProperty = flyd.stream('name');
-var sortDirection = flyd.stream('descending');
-
-var results = flyd.stream(flyd.curryN(3, get_results))
-  .pipe(flyd.ap(filter))
-  .pipe(flyd.ap(sortProperty))
-  .pipe(flyd.ap(sortDirection))
-  .pipe(flyd.map(function(d){ return d; }));
-```
-
-In the above example you have a stream of results that triggers a call for get_results
-every time `filter`, `sortProperty`, or `sortDirection` is changed.
-
-### flyd.on(fn, s)
+###flyd.on(fn, s)
 
 Similar to `map` except that the returned stream is empty. Use `on` for doing
 side effects in reaction to stream changes. Use the returned stream only if you
@@ -507,14 +443,14 @@ var numbers = flyd.stream(0);
 flyd.on(function(n) { console.log('numbers changed to', n); }, numbers);
 ```
 
-### flyd.scan(fn, acc, stream)
+###flyd.scan(fn, acc, stream)
 
 Creates a new stream with the results of calling the function on every incoming
-stream with an accumulator and the incoming value.
+stream with and accumulator and the incoming value.
 
 __Signature__
 
-`((a, b) -> a) -> a -> Stream b -> Stream a`
+`(a -> b -> a) -> a -> Stream b -> Stream a`
 
 __Example__
 ```javascript
@@ -524,7 +460,7 @@ numbers(2)(3)(5);
 sum(); // 10
 ```
 
-### flyd.merge(stream1, stream2)
+###flyd.merge(stream1, stream2)
 
 Creates a new stream down which all values from both `stream1` and `stream2`
 will be sent.
@@ -567,7 +503,7 @@ s1(1)(1)(2)(3)(3)(3)(4);
 results; // [2, 4, 6, 8]
 ```
 
-### flyd.curryN(n, fn)
+###flyd.curryN(n, fn)
 
 Returns `fn` curried to `n`. Use this function to curry functions exposed by
 modules for Flyd.
@@ -584,7 +520,7 @@ flyd.curryN(2, add);
 var add
 ```
 
-### stream()
+###stream()
 
 Returns the last value of the stream.
 
@@ -599,7 +535,7 @@ var names = flyd.stream('Turing');
 names(); // 'Turing'
 ```
 
-### stream(val)
+###stream(val)
 
 Pushes a value down the stream.
 
@@ -614,41 +550,12 @@ names('Bohr');
 names(); // 'Bohr'
 ```
 
-### stream.end
+###stream.end
 
 A stream that emits `true` when the stream ends. If `true` is pushed down the
 stream the parent stream ends.
 
-### stream.pipe(fn)
-
-Returns the result of applying function `fn` to the stream.
-
-__Signature__
-Called bound to `Stream a`: `(Stream a -> Stream b) -> Stream b`
-
-__Example__
-```javascript
-// map a stream
-var numbers = flyd.stream(0);
-var squaredNumbers = numbers
-  .pipe(flyd.map(function(n) { return n*n; }));
-
-// Chain a stream
-var filter = flyd.stream('filter');
-var search_results = filter
-  .pipe(flyd.chain(function(filter){
-    return flyd.stream(getResults(filter));
-  }));
-
-// use with a flyd module
-var filter = require('flyd/module/filter');
-var numbers = flyd.stream(0);
-var isEven = function(x){ return x % 2 === 0; };
-var evenNumbers = numbers
-  .pipe(filter(isEven));
-```
-
-### stream.map(f)
+###stream.map(f)
 
 Returns a new stream identical to the original except every
 value will be passed through `f`.
@@ -667,7 +574,7 @@ var numbers = flyd.stream(0);
 var squaredNumbers = numbers.map(function(n) { return n*n; });
 ```
 
-### stream1.ap(stream2)
+###stream1.ap(stream2)
 
 `stream1` must be a stream of functions.
 
@@ -691,7 +598,7 @@ var addToNumbers1 = flyd.map(add, numbers1);
 var added = addToNumbers1.ap(numbers2);
 ```
 
-### stream.of(value)
+###stream.of(value)
 
 Returns a new stream with `value` as its initial value. It is identical to
 calling `flyd.stream` with one argument.
@@ -714,9 +621,10 @@ will be added to this list.
 Modules listed with names in the format `flyd/module/filter` are builtin to the main `flyd` module and can be required with `require('flyd/module/filter')`. Other modules must be installed first with npm.
 
 | Module | Description |
-| --- | --- |
+| --- | --- | --- |
 | [flyd/module/**filter**](module/filter) | Filter values from stream based on predicate. |
 | [flyd/module/**lift**](module/lift) | Maps a function taking _n_ parameters over _n_ streams. |
+| [flyd/module/**flatmap**](module/flatmap) | Maps a function over a stream of streams and flattens the result to a single stream. |
 | [flyd/module/**switchlatest**](module/switchlatest) | Flattens a stream of streams. The result stream reflects changes from the last stream only. |
 | [flyd/module/**keepwhen**](module/keepwhen) | Keep values from one stream only when another stream is true. |
 | [flyd/module/**obj**](module/obj) | Functions for working with stream in objects. |
@@ -730,25 +638,12 @@ Modules listed with names in the format `flyd/module/filter` are builtin to the 
 | [**flyd-keyboard**](https://github.com/raine/flyd-keyboard) | Keyboard events as streams. |
 | [**flyd-glob**](https://github.com/StreetStrider/flyd-glob) | File glob and watch for Flyd. |
 | [**flyd-skip**](https://github.com/littlehaker/flyd-skip) | Skip function for flyd. |
-| [**flyd-until**](https://github.com/sourcevault/flyd-until) | only accept *n* event values - mirror function to `flyd-skip`. |
-| [**flyd-bufferCount**](https://github.com/bertofer/flyd-bufferCount) | Buffers the source stream and emits all values together. |
-| [**flyd-mergeAll (with high order streams)**](https://github.com/bertofer/flyd-mergeAll) | rxjs-like implementation of [mergeAll](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html#instance-method-mergeAll) for flyd. |
-| [**flyd-once**](https://github.com/bertofer/flyd-once) | Only emits the first value of the source stream. |
-| [**flyd-withLatestFrom**](https://github.com/bertofer/flyd-withLatestFrom) | When the source observable emits, the value also contains the latest value from withLatestFrom parameter stream. |
-| [**flyd-zip**](https://github.com/jayrbolton/flyd-zip) | Zip streams together into arrays of values |
-| [**flyd-undo**](https://github.com/jayrbolton/flyd-undo) | An undo/redo utility for saving and restoring state in flyd |
-| [**flyd-ajax**](https://github.com/jayrbolton/flyd-ajax) | An ajax utility that returns flyd streams |
-| [**flyd-xstate**](https://github.com/jayrbolton/flyd-xstate) | Integration of flyd with xstate Harel Statecharts |
-| [**flyd-windowresize**](https://github.com/jayrbolton/flyd-windowresize) | Get a stream for the window size |
-| [**flyd-stream-querystring**](https://github.com/jayrbolton/flyd-stream-querystring) | Manage the URL query params using flyd streams |
 | **Time related** |
 | [flyd/module/**every**](module/every) | Takes a number of milliseconds t and creates a stream of the current time updated every t. |
 | [flyd/module/**aftersilence**](module/aftersilence) | Buffers values from a source stream in an array and emits it after a specified duration of silence from the source stream. |
 | [flyd/module/**inlast**](module/inlast) | Creates a stream that emits a list of all values from the source stream that were emitted in a specified duration. |
 | [**flyd-onAnimationFrame**](https://github.com/ThomWright/flyd-onAnimationFrame) | Emits values from a source stream on successive animation frames. |
 | [**flyd-timeInterval**](https://github.com/ThomWright/flyd-timeInterval) | Records the time interval between consecutive values emitted from a stream. |
-| [**flyd-debounceTime**](https://github.com/bertofer/flyd-debounceTime) | Like aftersilence, but only emits the latest value of the stream. |
-| [**flyd-group-within**](https://github.com/sourcevault/flyd-group-within) |  buffers values within x millisecond.  |
 
 ## Misc
 
@@ -802,7 +697,7 @@ several streams change at the same time.
 
 Flyd implements atomic updates with a _O(n)_ topological sort where _n_
 is number of streams that directly or indirectly depends on the updated
-stream.
+stream. 
 
 ### Environment support
 
@@ -821,3 +716,8 @@ npm test
 The `npm test` command run three tests: a eslint js style checker test, the test of the core library and the test of the modules. If you want to run only the test of the library `npm run test`.
 
 The API.md file is generated using `npm run docs` (it assumes it has documentation installed globally: `npm i -g documentation`)
+
+
+
+
+
